@@ -899,7 +899,7 @@ export function check(chunk, file, opts = {}) {
             call.staticString = "table";
             return "str";
           }
-          if (functions.has(arg.name) || BUILTINS[arg.name]) {
+          if (!sym && (functions.has(arg.name) || BUILTINS[arg.name])) {
             call.staticString = "function";
             return "str";
           }
