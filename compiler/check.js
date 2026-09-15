@@ -823,6 +823,25 @@ export function check(chunk, file, opts = {}) {
         call.ordValue = code;
         return "int";
       }
+      if (b && b.special === "chr") {
+        call.sig = b;
+        if (call.args.length < 1) {
+          err(call, "chr(value,...) needs at least one constant byte");
+          return "str";
+        }
+        const chars = [];
+        for (const arg of call.args) {
+          const v = constEval(arg);
+          if (v === null || !Number.isInteger(v) || v < 0 || v > 255) {
+            err(arg, "chr() values must be constant integer bytes (0..255)");
+            chars.push(0);
+          } else {
+            chars.push(v);
+          }
+        }
+        call.staticString = String.fromCharCode(...chars);
+        return "str";
+      }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
         return addDelType(call, b.special, asStatement);

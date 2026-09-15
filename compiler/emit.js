@@ -8,6 +8,19 @@
 // Fixed multiply/divide/mod go through the lc_f* runtime; power-of-two
 // divisors fold to shifts/masks at compile time (exact for 16.16).
 
+function cStringBytes(value) {
+  let out = "";
+  for (const ch of String(value)) {
+    const code = ch.charCodeAt(0);
+    if (ch === "\\") out += "\\\\";
+    else if (ch === '"') out += '\\"';
+    else if (code >= 32 && code <= 126) out += ch;
+    else if (code <= 255) out += `\\${code.toString(8).padStart(3, "0")}`;
+    else out += ch;
+  }
+  return out;
+}
+
 
 // Split an index expression into (base, constant offset): `x + 3` -> [x, 3],
 // `x - 2` -> [x, -2], `5` -> [null, 5], anything else -> [expr, 0]. Lets the
@@ -1096,7 +1109,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         // print(v) / print(v, color) - no x,y, uses the running cursor
         const c = e.args[1] ? argAt(e, 1, "color") : "-1";
         if (e.printKind === "str") {
-          const esc = String(e.args[0].value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          const esc = cStringBytes(e.args[0].staticString ?? e.args[0].value);
           return `${pf("_cur_str")}("${esc}", ${c})`;
         }
         if (e.args[0].tk === "int") return `${pf("_cur_int")}(${expr(e.args[0], "int")}, ${c})`;
@@ -1110,7 +1123,7 @@ export function emit(chunk, symbols, file, opts = {}) {
       // the bake).
       const c = e.args[3] ? argAt(e, 3, "color") : "-1";
       if (e.printKind === "str") {
-        const esc = String(e.args[0].value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        const esc = cStringBytes(e.args[0].staticString ?? e.args[0].value);
         return `${pf("")}("${esc}", ${x}, ${y}, ${c})`;
       }
       // int-typed values skip the fixed widening + long digit path
@@ -1305,6 +1318,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         const tk = anyFixed ? "fixed" : "int";
         return expr({ kind: "binop", op: b.op, left: a0, right: e.args[1], tk }, tk);
       }
+      case "chr": return `"${cStringBytes(e.staticString ?? "")}"`;
       case "map": {
         // map(cx,cy,sx,sy,cw,ch) over the imported __map__ array (128 wide).
         // PICO-8 defaults: cel 0,0 -> screen 0,0, 128x32 cells.
