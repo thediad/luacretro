@@ -1128,6 +1128,7 @@ export function emit(chunk, symbols, file, opts = {}) {
       if (e.poolSym) return `${e.poolSym.cname}_n`;
       return String(e.arraySym?.size ?? 0);
     }
+    if (b.special === "ord") return String(e.ordValue ?? 0);
     if (b.special === "add") return emitAdd(e);
     if (b.special === "del") {
       const pl = e.poolSym;

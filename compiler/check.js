@@ -790,6 +790,39 @@ export function check(chunk, file, opts = {}) {
         err(arg, "count(t) needs a top-level array or pool");
         return "int";
       }
+      if (b && b.special === "ord") {
+        call.sig = b;
+        if (call.args.length < 1 || call.args.length > 2) {
+          err(call, "ord(str,[index]) supports one result from a literal string");
+          return "int";
+        }
+        const str = call.args[0];
+        if (str.kind !== "string") {
+          err(str, "ord() currently needs a string literal");
+          return "int";
+        }
+        str.inPrint = true;
+        let index = 1;
+        if (call.args[1]) {
+          const v = constEval(call.args[1]);
+          if (v === null || !Number.isInteger(v)) {
+            err(call.args[1], "ord() index must be a constant integer");
+            return "int";
+          }
+          index = v;
+        }
+        if (index < 1 || index > str.value.length) {
+          err(call, "ord() index is outside this literal string (nil results are not supported)");
+          return "int";
+        }
+        const code = str.value.charCodeAt(index - 1);
+        if (code > 255) {
+          err(str, "ord() literal must contain byte characters (0..255)");
+          return "int";
+        }
+        call.ordValue = code;
+        return "int";
+      }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
         return addDelType(call, b.special, asStatement);
