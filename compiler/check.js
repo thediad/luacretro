@@ -1212,13 +1212,21 @@ export function check(chunk, file, opts = {}) {
             return part.value;
           }
           const pt = typeOf(part);
-          return pt === "str" && typeof part.staticString === "string"
-            ? part.staticString
-            : null;
+          if (pt === "str" && typeof part.staticString === "string") return part.staticString;
+          if (pt === "int" || pt === "fixed") {
+            const value = constEval(part);
+            if (value !== null) {
+              const rounded = Math.round(value * 10000) / 10000;
+              return Number.isInteger(rounded)
+                ? String(rounded)
+                : rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+            }
+          }
+          return null;
         };
         const left = staticPart(e.left), right = staticPart(e.right);
         if (left === null || right === null) {
-          err(e, "runtime string concatenation is not supported; '..' operands must be static strings");
+          err(e, "runtime string concatenation is not supported; '..' operands must be static strings or constant numbers");
           return "int";
         }
         e.staticString = left + right;
