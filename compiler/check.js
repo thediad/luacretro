@@ -859,9 +859,13 @@ export function check(chunk, file, opts = {}) {
           return "str";
         }
         const p0 = constEval(call.args[1]);
-        const p1 = call.args[2] ? constEval(call.args[2]) : strValue.length;
+        // PICO-8 treats a supplied non-number POS1 as a request for the single
+        // character at POS0. The bounded dialect supports the common literal
+        // boolean form (sub(s, i, true)) without introducing dynamic types.
+        const single = call.args[2]?.kind === "bool";
+        const p1 = single ? p0 : (call.args[2] ? constEval(call.args[2]) : strValue.length);
         if (!Number.isInteger(p0) || !Number.isInteger(p1)) {
-          err(call, "sub() positions must be constant integers");
+          err(call, "sub() positions must be constant integers (or a literal boolean POS1 for one character)");
           return "str";
         }
         if (p0 < 1 || p1 < p0 || p1 > strValue.length) {
