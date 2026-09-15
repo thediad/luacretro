@@ -797,11 +797,13 @@ export function check(chunk, file, opts = {}) {
           return "int";
         }
         const str = call.args[0];
-        if (str.kind !== "string") {
-          err(str, "ord() currently needs a string literal");
+        let strValue;
+        if (str.kind === "string") { str.inPrint = true; strValue = str.value; }
+        else if (typeOf(str) === "str" && typeof str.staticString === "string") strValue = str.staticString;
+        else {
+          err(str, "ord() currently needs a static string expression");
           return "int";
         }
-        str.inPrint = true;
         let index = 1;
         if (call.args[1]) {
           const v = constEval(call.args[1]);
@@ -811,11 +813,11 @@ export function check(chunk, file, opts = {}) {
           }
           index = v;
         }
-        if (index < 1 || index > str.value.length) {
+        if (index < 1 || index > strValue.length) {
           err(call, "ord() index is outside this literal string (nil results are not supported)");
           return "int";
         }
-        const code = str.value.charCodeAt(index - 1);
+        const code = strValue.charCodeAt(index - 1);
         if (code > 255) {
           err(str, "ord() literal must contain byte characters (0..255)");
           return "int";
@@ -849,22 +851,24 @@ export function check(chunk, file, opts = {}) {
           return "str";
         }
         const str = call.args[0];
-        if (str.kind !== "string") {
-          err(str, "sub() currently needs a string literal");
+        let strValue;
+        if (str.kind === "string") { str.inPrint = true; strValue = str.value; }
+        else if (typeOf(str) === "str" && typeof str.staticString === "string") strValue = str.staticString;
+        else {
+          err(str, "sub() currently needs a static string expression");
           return "str";
         }
-        str.inPrint = true;
         const p0 = constEval(call.args[1]);
-        const p1 = call.args[2] ? constEval(call.args[2]) : str.value.length;
+        const p1 = call.args[2] ? constEval(call.args[2]) : strValue.length;
         if (!Number.isInteger(p0) || !Number.isInteger(p1)) {
           err(call, "sub() positions must be constant integers");
           return "str";
         }
-        if (p0 < 1 || p1 < p0 || p1 > str.value.length) {
+        if (p0 < 1 || p1 < p0 || p1 > strValue.length) {
           err(call, "sub() static positions must satisfy 1 <= pos0 <= pos1 <= string length");
           return "str";
         }
-        call.staticString = str.value.slice(p0 - 1, p1);
+        call.staticString = strValue.slice(p0 - 1, p1);
         return "str";
       }
       if (b && b.special === "tonum") {
@@ -886,6 +890,23 @@ export function check(chunk, file, opts = {}) {
         }
         call.tonumValue = value;
         return Number.isInteger(value) ? "int" : "fixed";
+      }
+      if (b && b.special === "tostr") {
+        call.sig = b;
+        if (call.args.length !== 1) {
+          err(call, "tostr() static form needs one constant number");
+          return "str";
+        }
+        const value = constEval(call.args[0]);
+        if (value === null) {
+          err(call.args[0], "tostr() currently needs a constant number");
+          return "str";
+        }
+        const rounded = Math.round(value * 10000) / 10000;
+        call.staticString = Number.isInteger(rounded)
+          ? String(rounded)
+          : rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+        return "str";
       }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
