@@ -988,22 +988,29 @@ export function check(chunk, file, opts = {}) {
       if (b && b.special === "tonum") {
         call.sig = b;
         if (call.args.length !== 1) {
-          err(call, "tonum() currently needs one decimal string literal or constant number");
+          err(call, "tonum() currently needs one static decimal string or constant number");
           return "int";
         }
         const arg = call.args[0];
         let value;
+        let text = null;
         if (arg.kind === "string") {
           arg.inPrint = true;
-          if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(arg.value)) {
+          text = arg.value;
+        } else if (constEval(arg) === null && typeOf(arg) === "str" &&
+                   typeof arg.staticString === "string") {
+          text = arg.staticString;
+        }
+        if (text !== null) {
+          if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
             err(arg, "tonum() static form accepts decimal literals only");
             return "int";
           }
-          value = Number(arg.value);
+          value = Number(text);
         } else {
           value = constEval(arg);
           if (value === null) {
-            err(arg, "tonum() currently needs a decimal string literal or constant number");
+            err(arg, "tonum() currently needs a static decimal string or constant number");
             return "int";
           }
         }
