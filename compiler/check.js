@@ -825,6 +825,41 @@ export function check(chunk, file, opts = {}) {
         call.ordValue = code;
         return "int";
       }
+      if (b && b.special === "type") {
+        call.sig = b;
+        if (call.args.length !== 1) {
+          err(call, "type() needs exactly one value");
+          return "str";
+        }
+        const arg = call.args[0];
+        if (arg.kind === "nil") {
+          arg.okSentinel = true;
+          call.staticString = "nil";
+          return "str";
+        }
+        if (arg.kind === "name") {
+          const sym = lookup(arg.name);
+          if (sym?.kind === "array" || sym?.kind === "pool") {
+            arg.sym = sym;
+            call.staticString = "table";
+            return "str";
+          }
+          if (functions.has(arg.name) || BUILTINS[arg.name]) {
+            call.staticString = "function";
+            return "str";
+          }
+        }
+        if (arg.kind === "string") arg.inPrint = true;
+        const kind = typeOf(arg);
+        if (kind === "str") call.staticString = "string";
+        else if (kind === "bool") call.staticString = "boolean";
+        else if (kind === "int" || kind === "fixed") call.staticString = "number";
+        else {
+          err(arg, "type() cannot classify this unsupported value");
+          call.staticString = "nil";
+        }
+        return "str";
+      }
       if (b && b.special === "chr") {
         call.sig = b;
         if (call.args.length < 1) {
