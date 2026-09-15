@@ -209,6 +209,61 @@ export function check(chunk, file, opts = {}) {
           });
           return;
         }
+        // Allocation-free PICO-8 split subset: a static numeric string becomes
+        // the same fixed numeric array as {1,2,3}. String-valued results need a
+        // dynamic string/table runtime, which this compiler deliberately lacks.
+        if (init && init.kind === "call" && init.callee.kind === "name" &&
+            init.callee.name === "split") {
+          const source = init.args[0];
+          const separator = init.args[1];
+          const convert = init.args[2];
+          const separatorSize = separator ? constEval(separator) : null;
+          const validSeparator = !separator || separator.kind === "string" ||
+            (Number.isInteger(separatorSize) && separatorSize > 0);
+          if (init.args.length < 1 || init.args.length > 3 || source?.kind !== "string" ||
+              !validSeparator ||
+              (convert && (convert.kind !== "bool" || convert.value !== true))) {
+            err(init, 'split() static form needs a literal string, optional literal string or positive integer separator, and convert_numbers=true');
+            return;
+          }
+          source.inPrint = true;
+          if (separator?.kind === "string") separator.inPrint = true;
+          const fields = Number.isInteger(separatorSize)
+            ? Array.from({ length: Math.ceil(source.value.length / separatorSize) },
+                (_, i) => source.value.slice(i * separatorSize, (i + 1) * separatorSize))
+            : source.value.split(separator?.value ?? ",");
+          if (fields.length === 0 || fields.length > LIMITS.arrayMax) {
+            err(init, `split() result needs between 1 and ${LIMITS.arrayMax} values`);
+            return;
+          }
+          const vals = [];
+          let anyFixed = false;
+          for (const field of fields) {
+            const text = field.trim();
+            if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+              err(init, "split() currently supports numeric results only");
+              return;
+            }
+            const value = Number(text);
+            if (!Number.isFinite(value) || value < -32768 || value >= 32768) {
+              err(init, "split() value is outside the 16.16 range");
+              return;
+            }
+            if (!Number.isInteger(value)) anyFixed = true;
+            vals.push(value);
+          }
+          const allByte = !anyFixed && vals.every((v) => v >= 0 && v <= 255);
+          globals.set(name, {
+            kind: "array",
+            elemKind: anyFixed ? "fixed" : "int",
+            elemBytes: allByte,
+            size: vals.length,
+            initVal: 0,
+            initList: vals,
+            node: s,
+          });
+          return;
+        }
         // top-level 'local x = nil': an int global starting at the sentinel.
         if (init && init.kind === "nil") {
           globals.set(name, { kind: "int", value: 0, nilInit: true, node: s });
@@ -859,6 +914,11 @@ export function check(chunk, file, opts = {}) {
           call.staticString = "nil";
         }
         return "str";
+      }
+      if (b && b.special === "split") {
+        call.sig = b;
+        err(call, "split() is currently supported only as a top-level static numeric array declaration");
+        return "array";
       }
       if (b && b.special === "chr") {
         call.sig = b;
