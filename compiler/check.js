@@ -54,6 +54,7 @@ export function check(chunk, file, opts = {}) {
     switch (e.kind) {
       case "number": return e.value;
       case "bool": return null;
+      case "len": return e.expr.kind === "string" ? e.expr.value.length : null;
       case "neg": {
         const v = constEval(e.expr);
         return v === null ? null : -v;
