@@ -842,6 +842,31 @@ export function check(chunk, file, opts = {}) {
         call.staticString = String.fromCharCode(...chars);
         return "str";
       }
+      if (b && b.special === "sub") {
+        call.sig = b;
+        if (call.args.length < 2 || call.args.length > 3) {
+          err(call, "sub(str,pos0,[pos1]) needs a literal string and constant positions");
+          return "str";
+        }
+        const str = call.args[0];
+        if (str.kind !== "string") {
+          err(str, "sub() currently needs a string literal");
+          return "str";
+        }
+        str.inPrint = true;
+        const p0 = constEval(call.args[1]);
+        const p1 = call.args[2] ? constEval(call.args[2]) : str.value.length;
+        if (!Number.isInteger(p0) || !Number.isInteger(p1)) {
+          err(call, "sub() positions must be constant integers");
+          return "str";
+        }
+        if (p0 < 1 || p1 < p0 || p1 > str.value.length) {
+          err(call, "sub() static positions must satisfy 1 <= pos0 <= pos1 <= string length");
+          return "str";
+        }
+        call.staticString = str.value.slice(p0 - 1, p1);
+        return "str";
+      }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
         return addDelType(call, b.special, asStatement);

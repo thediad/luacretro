@@ -1318,7 +1318,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         const tk = anyFixed ? "fixed" : "int";
         return expr({ kind: "binop", op: b.op, left: a0, right: e.args[1], tk }, tk);
       }
-      case "chr": return `"${cStringBytes(e.staticString ?? "")}"`;
+      case "chr": case "sub": return `"${cStringBytes(e.staticString ?? "")}"`;
       case "map": {
         // map(cx,cy,sx,sy,cw,ch) over the imported __map__ array (128 wide).
         // PICO-8 defaults: cel 0,0 -> screen 0,0, 128x32 cells.
