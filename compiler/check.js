@@ -318,21 +318,21 @@ export function check(chunk, file, opts = {}) {
           const source = init.args[0];
           const separator = init.args[1];
           const convert = init.args[2];
+          const sourceText = staticStringValue(source);
+          const separatorText = separator ? staticStringValue(separator) : null;
           const separatorSize = separator ? constEval(separator) : null;
-          const validSeparator = !separator || separator.kind === "string" ||
+          const validSeparator = !separator || separatorText !== null ||
             (Number.isInteger(separatorSize) && separatorSize > 0);
-          if (init.args.length < 1 || init.args.length > 3 || source?.kind !== "string" ||
+          if (init.args.length < 1 || init.args.length > 3 || sourceText === null ||
               !validSeparator ||
               (convert && (convert.kind !== "bool" || convert.value !== true))) {
-            err(init, 'split() static form needs a literal string, optional literal string or positive integer separator, and convert_numbers=true');
+            err(init, 'split() static form needs a static string, optional static string or positive integer separator, and convert_numbers=true');
             return;
           }
-          source.inPrint = true;
-          if (separator?.kind === "string") separator.inPrint = true;
           const fields = Number.isInteger(separatorSize)
-            ? Array.from({ length: Math.ceil(source.value.length / separatorSize) },
-                (_, i) => source.value.slice(i * separatorSize, (i + 1) * separatorSize))
-            : source.value.split(separator?.value ?? ",");
+            ? Array.from({ length: Math.ceil(sourceText.length / separatorSize) },
+                (_, i) => sourceText.slice(i * separatorSize, (i + 1) * separatorSize))
+            : sourceText.split(separatorText ?? ",");
           if (fields.length === 0 || fields.length > LIMITS.arrayMax) {
             err(init, `split() result needs between 1 and ${LIMITS.arrayMax} values`);
             return;
