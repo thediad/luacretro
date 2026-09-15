@@ -867,6 +867,26 @@ export function check(chunk, file, opts = {}) {
         call.staticString = str.value.slice(p0 - 1, p1);
         return "str";
       }
+      if (b && b.special === "tonum") {
+        call.sig = b;
+        if (call.args.length !== 1 || call.args[0].kind !== "string") {
+          err(call, "tonum() currently needs one decimal string literal");
+          return "int";
+        }
+        const str = call.args[0];
+        str.inPrint = true;
+        if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(str.value)) {
+          err(str, "tonum() static form accepts decimal literals only");
+          return "int";
+        }
+        const value = Number(str.value);
+        if (!Number.isFinite(value) || value < -32768 || value >= 32768) {
+          err(str, "tonum() value is outside the 16.16 range");
+          return "int";
+        }
+        call.tonumValue = value;
+        return Number.isInteger(value) ? "int" : "fixed";
+      }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
         return addDelType(call, b.special, asStatement);
