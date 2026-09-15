@@ -129,6 +129,30 @@ export function check(chunk, file, opts = {}) {
           }
           return constEval(e.args[0]);
         }
+        if (e.callee.name === "flr" || e.callee.name === "ceil" ||
+            e.callee.name === "sgn") {
+          if (e.args.length !== 1) return null;
+          const value = constEval(e.args[0]);
+          if (value === null) return null;
+          if (e.callee.name === "flr") return Math.floor(value);
+          if (e.callee.name === "ceil") return Math.ceil(value);
+          return value < 0 ? -1 : 1;
+        }
+        if (e.callee.name === "min" || e.callee.name === "max") {
+          if (e.args.length < 1 || e.args.length > 2) return null;
+          const left = constEval(e.args[0]);
+          const right = e.args[1] ? constEval(e.args[1]) : 0;
+          if (left === null || right === null) return null;
+          return e.callee.name === "min"
+            ? Math.min(left, right)
+            : Math.max(left, right);
+        }
+        if (e.callee.name === "mid") {
+          if (e.args.length !== 3) return null;
+          const values = e.args.map(constEval);
+          if (values.some((value) => value === null)) return null;
+          return values.sort((a, b) => a - b)[1];
+        }
         return null;
       }
       case "neg": {
