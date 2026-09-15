@@ -1124,6 +1124,10 @@ export function emit(chunk, symbols, file, opts = {}) {
       const mode = expr(e.args[1], "int");
       return `lc_pool_move(${pl.cname}_x, ${pl.cname}_y, ${pl.cname}_sx, ${pl.cname}_sy, ${pl.cname}_used, ${pl.cname}_hi, ${mode})`;
     }
+    if (b.special === "count") {
+      if (e.poolSym) return `${e.poolSym.cname}_n`;
+      return String(e.arraySym?.size ?? 0);
+    }
     if (b.special === "add") return emitAdd(e);
     if (b.special === "del") {
       const pl = e.poolSym;

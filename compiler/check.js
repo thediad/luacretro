@@ -767,6 +767,29 @@ export function check(chunk, file, opts = {}) {
         });
         return "int";
       }
+      if (b && b.special === "count") {
+        call.sig = b;
+        if (call.args.length !== 1) {
+          err(call, "count(t) takes exactly one array or pool");
+          return "int";
+        }
+        const arg = call.args[0];
+        if (arg.kind === "name") {
+          const sym = globals.get(arg.name);
+          if (sym?.kind === "pool") {
+            arg.sym = sym;
+            call.poolSym = sym;
+            return "int";
+          }
+          if (sym?.kind === "array") {
+            arg.sym = sym;
+            call.arraySym = sym;
+            return "int";
+          }
+        }
+        err(arg, "count(t) needs a top-level array or pool");
+        return "int";
+      }
       if (b && (b.special === "add" || b.special === "del")) {
         call.sig = b;
         return addDelType(call, b.special, asStatement);
