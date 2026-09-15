@@ -1236,7 +1236,7 @@ export function check(chunk, file, opts = {}) {
         }
         case "len": {
           if (e.expr.kind === "name") {
-            const sym = globals.get(e.expr.name);
+            const sym = lookup(e.expr.name);
             if (sym && sym.kind === "array") { e.arraySym = sym; return "int"; }
             if (sym && sym.kind === "pool") { e.poolSym = sym; return "int"; }
           }
