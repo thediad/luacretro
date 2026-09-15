@@ -108,6 +108,29 @@ export function check(chunk, file, opts = {}) {
       case "number": return e.value;
       case "bool": return null;
       case "len": return staticStringValue(e.expr)?.length ?? null;
+      case "call": {
+        if (e.callee.kind !== "name") return null;
+        if (e.callee.name === "ord") {
+          if (e.args.length < 1 || e.args.length > 2) return null;
+          const text = staticStringValue(e.args[0]);
+          const index = e.args[1] ? constEval(e.args[1]) : 1;
+          if (text === null || !Number.isInteger(index) ||
+              index < 1 || index > text.length) return null;
+          const code = text.charCodeAt(index - 1);
+          return code <= 255 ? code : null;
+        }
+        if (e.callee.name === "tonum") {
+          if (e.args.length !== 1) return null;
+          const text = staticStringValue(e.args[0]);
+          if (text !== null) {
+            return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)
+              ? Number(text)
+              : null;
+          }
+          return constEval(e.args[0]);
+        }
+        return null;
+      }
       case "neg": {
         const v = constEval(e.expr);
         return v === null ? null : -v;
