@@ -594,7 +594,7 @@ export function emit(chunk, symbols, file, opts = {}) {
       case "len": {
         if (e.stringLength !== undefined) return cv(String(e.stringLength), "int", want);
         if (e.poolSym) return cv(`${mangle(e.expr.name)}_n`, "int", want);
-        return String(e.arraySym?.size ?? 0);
+        return cv(String(e.arraySym?.size ?? 0), "int", want);
       }
       case "member": {
         if (e.poolField) {
