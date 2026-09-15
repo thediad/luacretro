@@ -48,13 +48,24 @@ export function check(chunk, file, opts = {}) {
 
   const isPow2 = (n) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
 
+  // Scope-independent literal lengths, usable before declarations are checked.
+  // Sum concatenated lengths without allocating the joined string.
+  function literalLength(e) {
+    if (e.kind === "string") return e.value.length;
+    if (e.kind === "binop" && e.op === "..") {
+      const left = literalLength(e.left), right = literalLength(e.right);
+      return left === null || right === null ? null : left + right;
+    }
+    return null;
+  }
+
   // Constant folding over VALUES (JS numbers, may be fractional).
   function constEval(e) {
     if (!e) return null;
     switch (e.kind) {
       case "number": return e.value;
       case "bool": return null;
-      case "len": return e.expr.kind === "string" ? e.expr.value.length : null;
+      case "len": return literalLength(e.expr);
       case "neg": {
         const v = constEval(e.expr);
         return v === null ? null : -v;
