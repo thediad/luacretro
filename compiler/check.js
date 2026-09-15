@@ -1143,8 +1143,20 @@ export function check(chunk, file, opts = {}) {
           : rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
         return "str";
       }
-      if (b && (b.special === "add" || b.special === "del")) {
+      if (b && (b.special === "add" || b.special === "del" || b.special === "deli")) {
         call.sig = b;
+        if (b.special === "deli") {
+          if (!asStatement) err(call, "deli() is a statement in gtlua; the removed struct cannot be returned");
+          if (call.args.length !== 2) {
+            err(call, "deli(pool, index) takes 2 arguments");
+            return "void";
+          }
+          const pl = poolOf(call.args[0], "deli()");
+          if (pl) call.poolSym = pl;
+          const it = typeOf(call.args[1]);
+          if (it !== "int") err(call.args[1], "deli() index must be an integer");
+          return "void";
+        }
         return addDelType(call, b.special, asStatement);
       }
       // rnd({a,b,c}) - PICO-8 "pick a random element". The list must be constant;

@@ -1148,6 +1148,7 @@ export function emit(chunk, symbols, file, opts = {}) {
     if (b.special === "del") {
       const pl = e.poolSym;
       const sv = e.args[1].sym?.forall?.slotVar ?? e.bindingSym?.forall?.slotVar;
+      const ov = e.args[1].sym?.forall?.orderVar ?? e.bindingSym?.forall?.orderVar;
       const f0 = `${pl.cname}_${pl.fields.keys().next().value}`;
       // Free slots chain through the FIRST field array (dead storage) with
       // +1-encoded links so a BSS-zeroed head means "empty chain" - add()
@@ -1155,8 +1156,24 @@ export function emit(chunk, symbols, file, opts = {}) {
       // adds used to walk the pool per particle). The high-water mark still
       // snaps to 0 when the pool empties (short all() scans), which also
       // resets the chain.
-      return `(${pl.cname}_used[${sv}] = 0, ${f0}[${sv}] = ${pl.cname}_free, ${pl.cname}_free = (unsigned char)(${sv} + 1), ` +
-             `(--${pl.cname}_n == 0 ? (${pl.cname}_hi = 0, ${pl.cname}_free = 0) : 0), (void)0)`;
+      const mv = `L_o${tempCounter++}`;
+      return `{ unsigned char ${mv}; ${pl.cname}_used[${sv}] = 0; ${f0}[${sv}] = ${pl.cname}_free; ` +
+             `${pl.cname}_free = (unsigned char)(${sv} + 1); --${pl.cname}_n; ` +
+             `for (${mv} = ${ov}; ${mv} < ${pl.cname}_n; ++${mv}) ${pl.cname}_order[${mv}] = ${pl.cname}_order[${mv} + 1]; ` +
+             `--${ov}; if (!${pl.cname}_n) { ${pl.cname}_hi = 0; ${pl.cname}_free = 0; } }`;
+    }
+    if (b.special === "deli") {
+      const pl = e.poolSym;
+      const iv = `L_i${tempCounter++}`;
+      const sv = `L_s${tempCounter++}`;
+      const mv = `L_o${tempCounter++}`;
+      const f0 = `${pl.cname}_${pl.fields.keys().next().value}`;
+      return `{ int ${iv} = ${expr(e.args[1], "int")} - 1; if (${iv} >= 0 && ${iv} < ${pl.cname}_n) { ` +
+             `unsigned char ${sv} = ${pl.cname}_order[${iv}]; unsigned char ${mv}; ` +
+             `${pl.cname}_used[${sv}] = 0; ${f0}[${sv}] = ${pl.cname}_free; ${pl.cname}_free = (unsigned char)(${sv} + 1); ` +
+             `--${pl.cname}_n; for (${mv} = (unsigned char)${iv}; ${mv} < ${pl.cname}_n; ++${mv}) ` +
+             `${pl.cname}_order[${mv}] = ${pl.cname}_order[${mv} + 1]; ` +
+             `if (!${pl.cname}_n) { ${pl.cname}_hi = 0; ${pl.cname}_free = 0; } } }`;
     }
     if (b.special) return specialCall(e, b, name);
 
@@ -1622,18 +1639,20 @@ export function emit(chunk, symbols, file, opts = {}) {
       }
       case "break": line("break;"); break;
       case "forall": {
+        const ov = `L_o${tempCounter++}`;
         const sv = `L_p${tempCounter++}`;
         s.slotVar = sv;
+        s.orderVar = ov;
         if (s.binding) s.binding.forallSlot = sv;
         // annotate: member nodes reference s (the forall) for slotVar
         // (unsigned char index: pools cap at 64, and the 6502 toolchain emits far tighter
         // indexing code for 8-bit induction variables)
         const pl = s.poolSym;
-        line(`{ unsigned char ${sv};`);
+        line(`{ unsigned char ${ov}, ${sv};`);
         indent++;
-        line(`for (${sv} = 0; ${sv} < ${pl.cname}_hi; ++${sv}) {`);
+        line(`for (${ov} = 0; ${ov} < ${pl.cname}_n; ++${ov}) {`);
         indent++;
-        line(`if (!${pl.cname}_used[${sv}]) continue;`);
+        line(`${sv} = ${pl.cname}_order[${ov}];`);
         block(s.body);
         indent--;
         line("}");
@@ -1666,7 +1685,7 @@ export function emit(chunk, symbols, file, opts = {}) {
     return `{ unsigned char ${sv}; ` +
            `if (${pl.cname}_free) { ${sv} = (unsigned char)(${pl.cname}_free - 1); ${pl.cname}_free = (unsigned char)${f0}[${sv}]; } ` +
            `else ${sv} = ${pl.cname}_hi; ` +
-           `if (${sv} < ${pl.size}) { ${pl.cname}_used[${sv}] = 1; ++${pl.cname}_n; ` +
+           `if (${sv} < ${pl.size}) { ${pl.cname}_used[${sv}] = 1; ${pl.cname}_order[${pl.cname}_n++] = ${sv}; ` +
            `if (${sv} >= ${pl.cname}_hi) ${pl.cname}_hi = ${sv} + 1; ${sets} } }`;
   }
 
@@ -1724,6 +1743,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         out.push(`${ct} ${g.cname}_${fname}[${g.size}];`);
       }
       out.push(`unsigned char ${g.cname}_used[${g.size}];`);
+      out.push(`unsigned char ${g.cname}_order[${g.size}];  /* live slots in insertion order */`);
       out.push(`unsigned char ${g.cname}_free;   /* free-chain head, +1-encoded (0 = empty) */`);
       out.push(`int ${g.cname}_n;`);
       // high-water mark: 1 + the highest ever-occupied slot since the pool
