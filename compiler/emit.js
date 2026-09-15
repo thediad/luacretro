@@ -656,6 +656,7 @@ export function emit(chunk, symbols, file, opts = {}) {
     const { op } = e;
     const k = e.tk; // result kind from the checker
 
+    if (op === "..") return `"${cStringBytes(e.staticString ?? "")}"`;
     if (op === "and") return `(${expr(e.left, "bool")} && ${expr(e.right, "bool")})`;
     if (op === "or") return `(${expr(e.left, "bool")} || ${expr(e.right, "bool")})`;
     if (["<", ">", "<=", ">=", "==", "~="].includes(op)) {

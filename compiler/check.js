@@ -1206,8 +1206,23 @@ export function check(chunk, file, opts = {}) {
         return "bool";
       }
       if (op === "..") {
-        err(e, "string concatenation is not supported yet");
-        return "int";
+        const staticPart = (part) => {
+          if (part.kind === "string") {
+            part.inPrint = true;
+            return part.value;
+          }
+          const pt = typeOf(part);
+          return pt === "str" && typeof part.staticString === "string"
+            ? part.staticString
+            : null;
+        };
+        const left = staticPart(e.left), right = staticPart(e.right);
+        if (left === null || right === null) {
+          err(e, "runtime string concatenation is not supported; '..' operands must be static strings");
+          return "int";
+        }
+        e.staticString = left + right;
+        return "str";
       }
 
       const lt = typeOf(e.left), rt = typeOf(e.right);
