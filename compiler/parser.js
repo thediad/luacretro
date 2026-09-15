@@ -110,6 +110,7 @@ export function parse(tokens, file, sdkName = "luacretro") {
         return { kind: "return", value, line: tok.line, col: tok.col };
       }
       case "break": next(); return { kind: "break", line: tok.line, col: tok.col };
+      case "?": return printShorthandStmt();
       case "do": {
         next();
         const body = block(["end"]);
@@ -140,7 +141,32 @@ export function parse(tokens, file, sdkName = "luacretro") {
 
   function isStatementStart(tok) {
     return ["local", "function", "if", "while", "for", "repeat", "return",
-            "break", "do", "goto", "name", ";"].includes(tok.type);
+            "break", "do", "goto", "name", "?", ";"].includes(tok.type);
+  }
+
+  // PICO-8's `?expr[,x,y[,c]]` shorthand is exactly a print call whose
+  // arguments run to the end of the source line. Build the ordinary call AST
+  // so type checking and target-specific print lowering stay in one place.
+  function printShorthandStmt() {
+    const tok = expect("?");
+    const args = [];
+    if (at("eof") || peek().line !== tok.line) {
+      error("'?' print shorthand needs a value on the same line", tok);
+    } else {
+      args.push(expression());
+      while (at(",") && peek().line === tok.line) {
+        next();
+        args.push(expression());
+      }
+    }
+    const call = {
+      kind: "call",
+      callee: { kind: "name", name: "print", line: tok.line, col: tok.col },
+      args,
+      line: tok.line,
+      col: tok.col,
+    };
+    return { kind: "callstmt", call, line: tok.line, col: tok.col };
   }
 
   function localStmt() {
@@ -585,11 +611,6 @@ export function parse(tokens, file, sdkName = "luacretro") {
         skipBalancedEnd();
         return { kind: "number", value: 0, fixed: 0, isInt: true, line: tok.line, col: tok.col };
       }
-      case "?":
-        error("'?' print shorthand is not supported yet (print lands with strings)", tok);
-        next();
-        sync(["eof"]);
-        return { kind: "number", value: 0, fixed: 0, isInt: true, line: tok.line, col: tok.col };
       default:
         error(`unexpected '${tok.value || tok.type}' in expression`, tok);
         next();
