@@ -1291,7 +1291,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         return a0.tk === "int" ? expr(a0, "int")
           : (N8 ? `((${expr(a0, "fixed")} + 0xFF) >> 8)` : `(int)((${expr(a0, "fixed")} + 0xFFFFL) >> 16)`);
       case "abs":
-        return anyFixed ? `lc_abs${N8 ? "i" : "f"}(${expr(a0, "fixed")})` : `lc_absi(${expr(a0, "int")})`;
+        return N8 ? `lc_absi(${expr(a0, "fixed")})` : `lc_absf(${expr(a0, "fixed")})`;
       case "sgn":
         return a0.tk === "int" ? `lc_sgni(${expr(a0, "int")})` : `lc_sgn${N8 ? "i" : "f"}(${expr(a0, "fixed")})`;
       case "min": case "max": {

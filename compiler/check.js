@@ -138,6 +138,15 @@ export function check(chunk, file, opts = {}) {
           if (e.callee.name === "ceil") return Math.ceil(value);
           return value < 0 ? -1 : 1;
         }
+        if (e.callee.name === "abs") {
+          if (e.args.length !== 1) return null;
+          const value = constEval(e.args[0]);
+          if (value === null) return null;
+          const minimum = opts.num8 ? -128 : -32768;
+          const maximum = opts.num8 ? (127 + 255 / 256) : (32767 + 65535 / 65536);
+          if (value < minimum || value >= -minimum) return null;
+          return value === minimum ? maximum : Math.abs(value);
+        }
         if (e.callee.name === "min" || e.callee.name === "max") {
           if (e.args.length < 1 || e.args.length > 2) return null;
           const left = constEval(e.args[0]);

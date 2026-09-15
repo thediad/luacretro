@@ -397,6 +397,12 @@ export function parse(tokens, file, sdkName = "luacretro") {
   function unary() {
     const tok = peek();
     if (at("not")) { next(); return { kind: "not", expr: unary(), line: tok.line, col: tok.col }; }
+    if (at("-") && peek(1).type === "number" && peek(1).minMagnitude) {
+      next();
+      next();
+      return { kind: "number", value: -32768, fixed: -2147483648,
+        isInt: true, line: tok.line, col: tok.col };
+    }
     if (at("-")) { next(); return { kind: "neg", expr: unary(), line: tok.line, col: tok.col }; }
     if (at("~")) { next(); return { kind: "bnot", expr: unary(), line: tok.line, col: tok.col }; }
     if (at("#")) {
@@ -510,6 +516,9 @@ export function parse(tokens, file, sdkName = "luacretro") {
     switch (tok.type) {
       case "number":
         next();
+        if (tok.minMagnitude) {
+          error("number 32768 is outside the 16.16 range (-32768 .. 32767.99998)", tok);
+        }
         return { kind: "number", value: tok.value, fixed: tok.fixed, isInt: tok.isInt, line: tok.line, col: tok.col };
       case "true": next(); return { kind: "bool", value: true, line: tok.line, col: tok.col };
       case "false": next(); return { kind: "bool", value: false, line: tok.line, col: tok.col };

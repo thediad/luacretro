@@ -67,10 +67,13 @@ export function lex(src, file) {
   function pushNumber(value, isIntLiteral, l, c) {
     const intVal = Math.trunc(value);
     const isInt = isIntLiteral && intVal >= -32768 && intVal <= 32767;
-    if (value > 32767.9999847 || value < -32768) {
+    // Keep the one extra positive magnitude needed to spell the signed minimum
+    // as `-32768`; the parser accepts it only when consumed by unary minus.
+    const minMagnitude = isIntLiteral && value === 32768;
+    if ((value > 32767.9999847 && !minMagnitude) || value < -32768) {
       err(`number ${value} is outside the 16.16 range (-32768 .. 32767.99998)`, l, c);
     }
-    tokens.push({ type: "number", value, fixed: toFixed(value), isInt, line: l, col: c });
+    tokens.push({ type: "number", value, fixed: toFixed(value), isInt, minMagnitude, line: l, col: c });
   }
 
   // Hex/binary literals are BIT PATTERNS for the 16.16 word, not decimal values.
