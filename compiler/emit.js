@@ -592,6 +592,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         return cv(indexRef(mangle(e.object.name), e.index, true), arr.elemKind, want);
       }
       case "len": {
+        if (e.stringLength !== undefined) return cv(String(e.stringLength), "int", want);
         if (e.poolSym) return cv(`${mangle(e.expr.name)}_n`, "int", want);
         return String(e.arraySym?.size ?? 0);
       }

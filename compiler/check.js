@@ -1240,7 +1240,17 @@ export function check(chunk, file, opts = {}) {
             if (sym && sym.kind === "array") { e.arraySym = sym; return "int"; }
             if (sym && sym.kind === "pool") { e.poolSym = sym; return "int"; }
           }
-          err(e, "'#' works on top-level arrays and pools only");
+          if (e.expr.kind === "string") {
+            e.expr.inPrint = true;
+            e.stringLength = e.expr.value.length;
+            return "int";
+          }
+          const kind = typeOf(e.expr);
+          if (kind === "str" && typeof e.expr.staticString === "string") {
+            e.stringLength = e.expr.staticString.length;
+            return "int";
+          }
+          err(e, "'#' works on top-level arrays and pools, or static string expressions");
           return "int";
         }
         case "call": return callType(e);
