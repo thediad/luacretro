@@ -48,13 +48,55 @@ export function check(chunk, file, opts = {}) {
 
   const isPow2 = (n) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
 
-  // Scope-independent literal lengths, usable before declarations are checked.
-  // Sum concatenated lengths without allocating the joined string.
-  function literalLength(e) {
-    if (e.kind === "string") return e.value.length;
+  function staticNumberText(value) {
+    const rounded = Math.round(value * 10000) / 10000;
+    return Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  }
+
+  // Scope-independent static strings, usable before declarations are checked.
+  // Keep this to allocation-free compiler intrinsics whose result depends only
+  // on their AST arguments; names and other scope-dependent values return null.
+  function staticStringValue(e) {
+    if (!e) return null;
+    if (e.kind === "string") return e.value;
     if (e.kind === "binop" && e.op === "..") {
-      const left = literalLength(e.left), right = literalLength(e.right);
+      const part = (node) => {
+        const text = staticStringValue(node);
+        if (text !== null) return text;
+        const value = constEval(node);
+        return value === null ? null : staticNumberText(value);
+      };
+      const left = part(e.left), right = part(e.right);
       return left === null || right === null ? null : left + right;
+    }
+    if (e.kind !== "call" || e.callee.kind !== "name") return null;
+    if (e.callee.name === "chr") {
+      if (e.args.length < 1) return null;
+      const chars = [];
+      for (const arg of e.args) {
+        const value = constEval(arg);
+        if (value === null || !Number.isInteger(value) || value < 0 || value > 255) return null;
+        chars.push(value);
+      }
+      return String.fromCharCode(...chars);
+    }
+    if (e.callee.name === "tostr") {
+      if (e.args.length === 0) return "";
+      if (e.args.length !== 1) return null;
+      const value = constEval(e.args[0]);
+      return value === null ? null : staticNumberText(value);
+    }
+    if (e.callee.name === "sub") {
+      if (e.args.length < 2 || e.args.length > 3) return null;
+      const text = staticStringValue(e.args[0]);
+      const p0 = constEval(e.args[1]);
+      const single = e.args[2]?.kind === "bool";
+      const p1 = single ? p0 : (e.args[2] ? constEval(e.args[2]) : text?.length);
+      if (text === null || !Number.isInteger(p0) || !Number.isInteger(p1) ||
+          p0 < 1 || p1 < p0 || p1 > text.length) return null;
+      return text.slice(p0 - 1, p1);
     }
     return null;
   }
@@ -65,7 +107,7 @@ export function check(chunk, file, opts = {}) {
     switch (e.kind) {
       case "number": return e.value;
       case "bool": return null;
-      case "len": return literalLength(e.expr);
+      case "len": return staticStringValue(e.expr)?.length ?? null;
       case "neg": {
         const v = constEval(e.expr);
         return v === null ? null : -v;
