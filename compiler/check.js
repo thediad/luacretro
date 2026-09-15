@@ -887,6 +887,21 @@ export function check(chunk, file, opts = {}) {
           return "str";
         }
         const arg = call.args[0];
+        // Folding type() must never erase evaluation of a runtime call.
+        // Only these allocation-free compiler intrinsics may be nested here.
+        const staticCalls = new Set(["chr", "sub", "tostr", "tonum", "ord", "type", "count"]);
+        const hasRuntimeCall = (node) => {
+          if (!node || typeof node !== "object") return false;
+          if (node.kind === "call" &&
+              (node.callee.kind !== "name" ||
+               !staticCalls.has(BUILTINS[node.callee.name]?.special))) return true;
+          return [node.expr, node.left, node.right, node.object, node.index,
+            ...(node.args || [])].some(hasRuntimeCall);
+        };
+        if (hasRuntimeCall(arg)) {
+          err(arg, "type() cannot fold runtime calls; evaluate the expression into a variable first");
+          return "str";
+        }
         if (arg.kind === "nil") {
           arg.okSentinel = true;
           call.staticString = "nil";
