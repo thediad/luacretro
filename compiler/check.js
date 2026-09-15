@@ -877,19 +877,28 @@ export function check(chunk, file, opts = {}) {
       }
       if (b && b.special === "tonum") {
         call.sig = b;
-        if (call.args.length !== 1 || call.args[0].kind !== "string") {
-          err(call, "tonum() currently needs one decimal string literal");
+        if (call.args.length !== 1) {
+          err(call, "tonum() currently needs one decimal string literal or constant number");
           return "int";
         }
-        const str = call.args[0];
-        str.inPrint = true;
-        if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(str.value)) {
-          err(str, "tonum() static form accepts decimal literals only");
-          return "int";
+        const arg = call.args[0];
+        let value;
+        if (arg.kind === "string") {
+          arg.inPrint = true;
+          if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(arg.value)) {
+            err(arg, "tonum() static form accepts decimal literals only");
+            return "int";
+          }
+          value = Number(arg.value);
+        } else {
+          value = constEval(arg);
+          if (value === null) {
+            err(arg, "tonum() currently needs a decimal string literal or constant number");
+            return "int";
+          }
         }
-        const value = Number(str.value);
         if (!Number.isFinite(value) || value < -32768 || value >= 32768) {
-          err(str, "tonum() value is outside the 16.16 range");
+          err(arg, "tonum() value is outside the 16.16 range");
           return "int";
         }
         call.tonumValue = value;
@@ -897,8 +906,12 @@ export function check(chunk, file, opts = {}) {
       }
       if (b && b.special === "tostr") {
         call.sig = b;
+        if (call.args.length === 0) {
+          call.staticString = "";
+          return "str";
+        }
         if (call.args.length !== 1) {
-          err(call, "tostr() static form needs one constant number");
+          err(call, "tostr() static form takes zero arguments or one constant number");
           return "str";
         }
         const value = constEval(call.args[0]);
