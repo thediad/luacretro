@@ -218,6 +218,24 @@ test("PICO flag specials distinguish whole bytes from bit access", () => {
     "md_fset(7, 0, ((1) ? 1 : 0))", "md_fset(7, 1, ((0) ? 1 : 0))"]) assert.ok(r.c.includes(call), call);
 });
 
+test("banked blob readers retain their XL bank and renamed far-call stubs", () => {
+  for (let bank = 6; bank <= 13; bank++) {
+    const r = compile(`local data=hexdata("0102") local n=0
+      function readbyte(i) return data[i] end
+      function _update60() n=readbyte(1) end function _draw() end`, "bank.lua",
+      { target: TARGETS.gametank, builtins: CORE, callbacks: CALLBACKS, banked: true,
+        placement: { readbyte: `b${bank}`, _update60: "b0", _draw: "b1" } });
+    assert.ok(r.ok, JSON.stringify(r.diagnostics));
+    assert.ok(r.c.includes(`"B${bank}RODATA"`));
+    assert.ok(r.c.includes(`"B${bank}CODE"`));
+    assert.match(r.c, /gt_p0 = 1, stub_lcl_readbyte\(\)/);
+    assert.match(r.stubs, /jsr gt_bank_raw/);
+    assert.match(r.stubs, /lda gt_cur_bank/);
+    assert.doesNotMatch(r.stubs, /\blc_/);
+    assert.ok(r.stubs.includes(`lda #${bank}`));
+  }
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",
