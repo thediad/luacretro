@@ -102,6 +102,8 @@ export function check(chunk, file, opts = {}) {
   }
 
   // Constant folding over VALUES (JS numbers, may be fractional).
+  const declaredFunctions = new Set(chunk.stmts.filter(s => s.kind === "function").map(s => s.name));
+  let constantNameIsBound = name => globals.has(name);
   function constEval(e) {
     if (!e) return null;
     switch (e.kind) {
@@ -110,6 +112,16 @@ export function check(chunk, file, opts = {}) {
       case "len": return staticStringValue(e.expr)?.length ?? null;
       case "call": {
         if (e.callee.kind !== "name") return null;
+        const descriptor = BUILTINS[e.callee.name];
+        if (typeof descriptor?.constEval === "function") {
+          if (constantNameIsBound(e.callee.name) || declaredFunctions.has(e.callee.name)) return null;
+          const required = descriptor.params.filter(([, optional]) => !optional).length;
+          if (e.args.length < required || e.args.length > descriptor.params.length) return null;
+          const values = e.args.map(constEval);
+          if (values.some(value => value === null || !Number.isFinite(value))) return null;
+          const result = descriptor.constEval(values, { num8: opts.num8 === true });
+          return typeof result === "number" && Number.isFinite(result) ? result : null;
+        }
         if (e.callee.name === "ord") {
           if (e.args.length < 1 || e.args.length > 2) return null;
           const text = staticStringValue(e.args[0]);
@@ -432,6 +444,7 @@ export function check(chunk, file, opts = {}) {
   checkFunctionBodies();
 
   function checkFunction(fn) {
+    constantNameIsBound = name => lookup(name) !== null;
     const scopes = [new Map()];
     fn.params.forEach((p, i) => {
       if (scopes[0].has(p)) err(fn.node, `duplicate parameter '${p}'`);

@@ -257,6 +257,27 @@ test("SDK emission hooks own API lowering and retain shared argument checks", ()
   assert.equal(emitted, 2, "invalid calls must not reach the SDK emitter");
 });
 
+test("SDK constant hooks fold only static numeric calls with valid arity", () => {
+  const scale = { params: [["num", false]], ret: "fixed", c: "lc_scale",
+    constEval: ([value], { num8 }) => value < 0 ? null : value / (num8 ? 4 : 2) };
+  const opts = { target: TARGETS.md, builtins: { scale }, callbacks: CALLBACKS };
+  for (const num8 of [false, true]) {
+    const r = compile("local n=scale(3) function _draw() local v=scale(3) end", "fold.lua", { ...opts, num8 });
+    assert.ok(r.ok, JSON.stringify(r.diagnostics));
+    assert.ok(r.c.includes(num8 ? "int lcl_n = 192" : "long lcl_n = 98304L"));
+    assert.match(r.c, /md_scale\(/, "runtime calls keep the SDK implementation");
+  }
+  for (const args of ["", "1,2", "true", "-1", "scale(-1)"]) {
+    assert.ok(!compile(`local n=scale(${args}) function _draw() end`, "fold.lua", opts).ok);
+  }
+  for (const result of [NaN, Infinity, undefined, "1"]) {
+    assert.ok(!compile("local n=scale(1) function _draw() end", "fold.lua",
+      { ...opts, builtins: { scale: { ...scale, constEval: () => result } } }).ok);
+  }
+  assert.ok(!compile("local scale=1 local n=scale(3) function _draw() end", "fold.lua", opts).ok);
+  assert.ok(!compile("local n=scale(3) function scale(x) return x end function _draw() end", "fold.lua", opts).ok);
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",

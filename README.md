@@ -56,6 +56,13 @@ may reject unsupported hardware operations by throwing an error. GameTank's
 `palt` descriptor uses this hook to own its color-zero-only policy; there is
 no GameTank palette restriction in the shared compiler.
 
+A numeric builtin may also supply `constEval(values, { num8 })`. It receives
+only finite, statically known numeric arguments after arity checks, and returns
+a finite numeric value or `null` to decline folding. Hooks must be pure and
+match the SDK runtime's rounding and range rules. Shadowed builtin names are
+not folded. Calls in executable code still use the runtime; the hook serves
+constant-expression contexts such as top-level initializers.
+
 The emitter derives every per-platform behavior from a single capability table
 (`CAPS` in `compiler/emit.js`) keyed by `opts.target`:
 
