@@ -22,6 +22,34 @@ const { ok, c, diagnostics, callGraph, stubs } =
 
 ## Targets and capabilities
 
+### Opt-in PICO API specials
+
+SDK builtin descriptors enable these lowerings through `special`; the compiler
+does not enable console APIs by their Lua names. SDKs own the runtime functions
+and hardware restrictions.
+
+- `clip`: zero arguments call `lc_clip_reset()`; four or five call
+  `lc_clip(x, y, w, h, previous)`, with `previous` defaulting to zero.
+- `cartdata`: one literal ID (1-64 lowercase ASCII letters, digits, underscores)
+  becomes a 32-bit FNV-1a hash passed to `lc_cartdata`.
+- `map`: passes `lcl___p8map`, width 128, and seven arguments to `lc_map`.
+  Defaults are `0, 0, 0, 0, 128, 64, -1`; an explicit zero layer mask remains
+  zero. **Runtime ABI change:** SDKs using this special must accept the ninth
+  C argument, the layer mask, even if their runtime ignores it.
+- `mget`: without `c`, preserves the legacy direct 128-wide array read.
+  With `c: "lc_mget"` (or another runtime name), passes the map pointer, x, y
+  to that helper. SDKs with mutable maps should opt into this helper so reads
+  see runtime writes; hardware tilemap APIs need not share this ABI.
+- `mset`: passes the map pointer, x, y, tile to `c` (default `lc_mset`).
+- `fget` / `fset`: use `lc_fget(sprite, bit)` and
+  `lc_fset(sprite, bit, value)`; bit -1 denotes the whole flag byte. A supplied
+  bit is preserved, and the three-argument `fset` value is a boolean flag.
+
+These calls use the SDK's normal prefix/finalRename rules. Bounds handling,
+map storage, flag storage, persistence, and palette restrictions remain in the
+SDK. `palt` is not migrated: the GameTank vendor currently embeds hardware
+policy that must be separated before adopting canonical luacretro there.
+
 The emitter derives every per-platform behavior from a single capability table
 (`CAPS` in `compiler/emit.js`) keyed by `opts.target`:
 

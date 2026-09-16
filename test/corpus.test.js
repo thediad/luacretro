@@ -7,6 +7,11 @@ import { compile } from "../compiler/index.js";
 // SDK's own suite via test/golden-c; this proves the front-end compiles for
 // every target and the target seams fire correctly.
 const CORE = {
+  map: { params: [["int", true], ["int", true], ["coord", true], ["coord", true], ["int", true], ["int", true], ["int", true]], ret: "void", special: "map" },
+  mget: { params: [["int", false], ["int", false]], ret: "int", special: "mget", c: "lc_mget" },
+  mset: { params: [["int", false], ["int", false], ["int", false]], ret: "void", special: "mset" },
+  fget: { params: [["int", false], ["int", true]], ret: "int", special: "fget" },
+  fset: { params: [["int", false], ["int", false], ["flip", true]], ret: "void", special: "fset" },
   cartdata: { params: [["str", false]], ret: "bool", special: "cartdata" },
   clip: { params: [["coord", true], ["coord", true], ["coord", true], ["coord", true], ["flip", true]], ret: "void", special: "clip" },
   cls:      { params: [["color", true]], ret: "void", c: "lc_cls" },
@@ -176,6 +181,41 @@ test("cartdata descriptor rejects invalid IDs, nonliterals, and wrong arity", ()
     { target: TARGETS.md, builtins: { cartdata: { params: [["str", false]], ret: "void", c: "lc_save" } }, callbacks: CALLBACKS });
   assert.ok(r.ok, JSON.stringify(r.diagnostics));
   assert.doesNotMatch(r.c, /md_cartdata\(/);
+});
+
+test("PICO map special preserves defaults and explicit layer masks", () => {
+  const r = compile(`local __p8map=hexdata("0102")
+    function _draw() map() map(1,2,3,4,5,6) map(1,2,3,4,5,6,0) map(1,2,3,4,5,6,3) end`, "map.lua",
+    { target: TARGETS.md, builtins: CORE, callbacks: CALLBACKS });
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  for (const args of ["0, 0, 0, 0, 128, 64, -1", "1, 2, 3, 4, 5, 6, -1", "1, 2, 3, 4, 5, 6, 0", "1, 2, 3, 4, 5, 6, 3"]) {
+    assert.ok(r.c.includes(`md_map(lcl___p8map, 128, ${args})`));
+  }
+});
+
+test("PICO map access opts into runtime helpers without changing legacy reads", () => {
+  const source = `local __p8map=hexdata("0102") function _draw() local n=mget(1,2) mset(3,4,5) end`;
+  const opts = { target: TARGETS.md, builtins: CORE, callbacks: CALLBACKS };
+  const r = compile(source, "map.lua", opts);
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  assert.match(r.c, /md_mget\(lcl___p8map, 1, 2\)/);
+  assert.match(r.c, /md_mset\(lcl___p8map, 3, 4, 5\)/);
+  const legacy = compile(source, "map.lua", { ...opts, builtins: { ...CORE, mget: { ...CORE.mget, c: undefined } } });
+  assert.ok(legacy.ok, JSON.stringify(legacy.diagnostics));
+  assert.ok(legacy.c.includes("lcl___p8map[(2) * 128 + (1)]"));
+  const custom = compile(source, "map.lua", { ...opts, builtins: { ...CORE, mget: { ...CORE.mget, c: "lc_p8_read" }, mset: { ...CORE.mset, c: "lc_p8_write" } } });
+  assert.ok(custom.ok, JSON.stringify(custom.diagnostics));
+  assert.match(custom.c, /md_p8_read\(lcl___p8map, 1, 2\)/);
+  assert.match(custom.c, /md_p8_write\(lcl___p8map, 3, 4, 5\)/);
+});
+
+test("PICO flag specials distinguish whole bytes from bit access", () => {
+  const r = compile(`function _draw() local a=fget(7) local b=fget(7,0)
+    fset(7,255) fset(7,0,true) fset(7,1,false) end`, "flags.lua",
+    { target: TARGETS.md, builtins: CORE, callbacks: CALLBACKS });
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  for (const call of ["md_fget(7, -1)", "md_fget(7, 0)", "md_fset(7, -1, 255)",
+    "md_fset(7, 0, ((1) ? 1 : 0))", "md_fset(7, 1, ((0) ? 1 : 0))"]) assert.ok(r.c.includes(call), call);
 });
 
 test("sdkName threads into diagnostics", () => {

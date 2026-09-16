@@ -1357,16 +1357,30 @@ export function emit(chunk, symbols, file, opts = {}) {
         return `lc_clip(${x}, ${y}, ${w}, ${h}, ${previous})`;
       }
       case "map": {
-        // map(cx,cy,sx,sy,cw,ch) over the imported __map__ array (128 wide).
-        // PICO-8 defaults: cel 0,0 -> screen 0,0, 128x32 cells.
+        // PICO asset ABI: 128x64 cells, with -1 for an omitted layer mask.
         const cx = argAt(e, 0, "int", "0"), cy = argAt(e, 1, "int", "0");
         const sx = argAt(e, 2, "int", "0"), sy = argAt(e, 3, "int", "0");
-        const cw = argAt(e, 4, "int", "128"), ch = argAt(e, 5, "int", "32");
-        return `lc_map(lcl___p8map, 128, ${cx}, ${cy}, ${sx}, ${sy}, ${cw}, ${ch})`;
+        const cw = argAt(e, 4, "int", "128"), ch = argAt(e, 5, "int", "64");
+        const layers = argAt(e, 6, "int", "-1");
+        return `lc_map(lcl___p8map, 128, ${cx}, ${cy}, ${sx}, ${sy}, ${cw}, ${ch}, ${layers})`;
       }
       case "mget": {
+        // SDKs with mutable/overlaid maps opt into a pointer-based runtime
+        // helper. A same-named hardware tilemap API may have a different ABI.
+        if (b.c) return `${cName(b.c)}(lcl___p8map, ${argAt(e, 0, "int", "0")}, ${argAt(e, 1, "int", "0")})`;
         // mget(x,y) -> the tile index at map cell (x,y) in the 128-wide array
         return `lcl___p8map[(${argAt(e, 1, "int", "0")}) * 128 + (${argAt(e, 0, "int", "0")})]`;
+      }
+      case "mset": {
+        return `${cName(b.c || "lc_mset")}(lcl___p8map, ${argAt(e, 0, "int", "0")}, ${argAt(e, 1, "int", "0")}, ${argAt(e, 2, "int", "0")})`;
+      }
+      case "fget": {
+        return `lc_fget(${argAt(e, 0, "int", "0")}, ${argAt(e, 1, "int", "-1")})`;
+      }
+      case "fset": {
+        const n = argAt(e, 0, "int", "0");
+        if (e.args.length === 2) return `lc_fset(${n}, -1, ${argAt(e, 1, "int", "0")})`;
+        return `lc_fset(${n}, ${argAt(e, 1, "int", "0")}, ${argAt(e, 2, "flip", "0")})`;
       }
       case "sspr": {
         // sspr(sx,sy,sw,sh, dx,dy, [dw,dh], [flipx,flipy]) -> lc_sspr.
