@@ -1199,6 +1199,10 @@ export function check(chunk, file, opts = {}) {
         if (b.special === "clip" && call.args.length > 0 && call.args.length < 4) {
           err(call, `${callee.name}() takes 0, 4, or 5 arguments`);
         }
+        if (b.special === "cartdata" && call.args[0]?.kind === "string" &&
+            !/^[a-z0-9_]{1,64}$/.test(call.args[0].value)) {
+          err(call.args[0], `${callee.name}() ID must be 1-64 characters: a-z, 0-9, or underscore`);
+        }
         call.sig = b;
         // a "fn" (callback) arg is a bare function NAME, not a value - don't run
         // typeOf on it (that would trip the "functions are not values" error);

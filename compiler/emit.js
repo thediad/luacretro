@@ -1340,6 +1340,15 @@ export function emit(chunk, symbols, file, opts = {}) {
       case "chr": case "sub": case "tostr": case "type": return `"${cStringBytes(e.staticString ?? "")}"`;
       case "tonum": return e.tk === "int" ? String(Math.trunc(e.tonumValue ?? 0))
         : `${Math.round((e.tonumValue ?? 0) * FONE) | 0}${FL}`;
+      case "cartdata": {
+        // The descriptor opts into literal ASCII IDs hashed with FNV-1a.
+        let h = 0x811c9dc5;
+        for (const ch of e.args[0].value) {
+          h ^= ch.charCodeAt(0);
+          h = Math.imul(h, 0x01000193) >>> 0;
+        }
+        return `lc_cartdata(0x${h.toString(16).padStart(8, "0")}UL)`;
+      }
       case "clip": {
         if (e.args.length === 0) return "lc_clip_reset()";
         const x = argAt(e, 0, "int", "0"), y = argAt(e, 1, "int", "0");

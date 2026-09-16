@@ -7,6 +7,7 @@ import { compile } from "../compiler/index.js";
 // SDK's own suite via test/golden-c; this proves the front-end compiles for
 // every target and the target seams fire correctly.
 const CORE = {
+  cartdata: { params: [["str", false]], ret: "bool", special: "cartdata" },
   clip: { params: [["coord", true], ["coord", true], ["coord", true], ["coord", true], ["flip", true]], ret: "void", special: "clip" },
   cls:      { params: [["color", true]], ret: "void", c: "lc_cls" },
   rectfill: { params: [["coord", false], ["coord", false], ["coord", false], ["coord", false], ["color", true]], ret: "void", c: "lc_rectfill" },
@@ -142,6 +143,39 @@ test("clip validation follows the descriptor and rejects partial rectangles", ()
     { target: TARGETS.md, builtins: { clip: { params: [["int", false]], ret: "void", c: "lc_custom_clip" } }, callbacks: CALLBACKS });
   assert.ok(r.ok, JSON.stringify(r.diagnostics));
   assert.match(r.c, /md_custom_clip\(1\)/);
+});
+
+test("cartdata special hashes literal IDs and renames the runtime call", () => {
+  for (const name of ["cartdata", "save_id"]) {
+    const r = compile(`function _draw() ${name}("a") ${name}("foobar") end`, "save.lua",
+      { target: TARGETS.md, builtins: { [name]: CORE.cartdata }, callbacks: CALLBACKS });
+    assert.ok(r.ok, JSON.stringify(r.diagnostics));
+    assert.match(r.c, /md_cartdata\(0xe40c292cUL\)/);
+    assert.match(r.c, /md_cartdata\(0xbf9cf968UL\)/);
+    const boundary = compile(`function _draw() ${name}("${"a".repeat(64)}") end`, "save.lua",
+      { target: TARGETS.md, builtins: { [name]: CORE.cartdata }, callbacks: CALLBACKS });
+    assert.ok(boundary.ok, JSON.stringify(boundary.diagnostics));
+  }
+});
+
+test("cartdata descriptor rejects invalid IDs, nonliterals, and wrong arity", () => {
+  for (const name of ["cartdata", "save_id"]) {
+    for (const value of ["", "A", "a-b", "a b", "é", "a".repeat(65)]) {
+      const r = compile(`function _draw() ${name}("${value}") end`, "save.lua",
+        { target: TARGETS.md, builtins: { [name]: CORE.cartdata }, callbacks: CALLBACKS });
+      assert.ok(!r.ok);
+      assert.match(r.diagnostics.map(d => d.message).join("\n"), /ID must be 1-64/);
+    }
+    for (const args of ["", "123", '"a","b"', '"a".."b"']) {
+      const r = compile(`function _draw() ${name}(${args}) end`, "save.lua",
+        { target: TARGETS.md, builtins: { [name]: CORE.cartdata }, callbacks: CALLBACKS });
+      assert.ok(!r.ok);
+    }
+  }
+  const r = compile(`function _draw() cartdata("ANY-ID") end`, "save.lua",
+    { target: TARGETS.md, builtins: { cartdata: { params: [["str", false]], ret: "void", c: "lc_save" } }, callbacks: CALLBACKS });
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  assert.doesNotMatch(r.c, /md_cartdata\(/);
 });
 
 test("sdkName threads into diagnostics", () => {
