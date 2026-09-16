@@ -7,6 +7,7 @@ import { compile } from "../compiler/index.js";
 // SDK's own suite via test/golden-c; this proves the front-end compiles for
 // every target and the target seams fire correctly.
 const CORE = {
+  clip: { params: [["coord", true], ["coord", true], ["coord", true], ["coord", true], ["flip", true]], ret: "void", special: "clip" },
   cls:      { params: [["color", true]], ret: "void", c: "lc_cls" },
   rectfill: { params: [["coord", false], ["coord", false], ["coord", false], ["coord", false], ["color", true]], ret: "void", c: "lc_rectfill" },
   circfill: { params: [["coord", false], ["coord", false], ["coord", false], ["color", true]], ret: "void", c: "lc_circfill" },
@@ -115,6 +116,32 @@ test("md harness is main(bool hard) + md_ includes", () => {
   assert.match(r.c, /int main\(bool hard\)/);
   assert.match(r.c, /#include "md_api.h"/);
   assert.match(r.c, /md_cls/);
+});
+
+test("clip special lowers reset, rectangle, and previous through target rename", () => {
+  for (const name of ["clip", "viewport"]) {
+    const r = compile(`function _draw() ${name}() ${name}(1,2,3,4) ${name}(5,6,7,8,true) end`, "clip.lua",
+      { target: TARGETS.md, builtins: { [name]: CORE.clip }, callbacks: CALLBACKS });
+    assert.ok(r.ok, JSON.stringify(r.diagnostics));
+    assert.match(r.c, /md_clip_reset\(\)/);
+    assert.match(r.c, /md_clip\(1, 2, 3, 4, 0\)/);
+    assert.match(r.c, /md_clip\(5, 6, 7, 8, \(\(1\) \? 1 : 0\)\)/);
+  }
+});
+
+test("clip validation follows the descriptor and rejects partial rectangles", () => {
+  for (const name of ["clip", "viewport"]) {
+    for (const args of ["1", "1,2", "1,2,3", "1,2,3,4,true,6"]) {
+      const r = compile(`function _draw() ${name}(${args}) end`, "clip.lua",
+        { target: TARGETS.md, builtins: { [name]: CORE.clip }, callbacks: CALLBACKS });
+      assert.ok(!r.ok);
+      assert.match(r.diagnostics.map(d => d.message).join("\n"), /takes .*argument/);
+    }
+  }
+  const r = compile(`function _draw() clip(1) end`, "clip.lua",
+    { target: TARGETS.md, builtins: { clip: { params: [["int", false]], ret: "void", c: "lc_custom_clip" } }, callbacks: CALLBACKS });
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  assert.match(r.c, /md_custom_clip\(1\)/);
 });
 
 test("sdkName threads into diagnostics", () => {

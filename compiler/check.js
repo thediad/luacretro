@@ -1196,6 +1196,9 @@ export function check(chunk, file, opts = {}) {
       if (b) {
         if (b.audio) { usesAudio.flag = true; usesMusic.flag = true; }
         checkArgs(call, b.params, callee.name);
+        if (b.special === "clip" && call.args.length > 0 && call.args.length < 4) {
+          err(call, `${callee.name}() takes 0, 4, or 5 arguments`);
+        }
         call.sig = b;
         // a "fn" (callback) arg is a bare function NAME, not a value - don't run
         // typeOf on it (that would trip the "functions are not values" error);

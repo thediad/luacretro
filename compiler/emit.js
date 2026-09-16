@@ -1340,6 +1340,13 @@ export function emit(chunk, symbols, file, opts = {}) {
       case "chr": case "sub": case "tostr": case "type": return `"${cStringBytes(e.staticString ?? "")}"`;
       case "tonum": return e.tk === "int" ? String(Math.trunc(e.tonumValue ?? 0))
         : `${Math.round((e.tonumValue ?? 0) * FONE) | 0}${FL}`;
+      case "clip": {
+        if (e.args.length === 0) return "lc_clip_reset()";
+        const x = argAt(e, 0, "int", "0"), y = argAt(e, 1, "int", "0");
+        const w = argAt(e, 2, "int", "0"), h = argAt(e, 3, "int", "0");
+        const previous = argAt(e, 4, "flip", "0");
+        return `lc_clip(${x}, ${y}, ${w}, ${h}, ${previous})`;
+      }
       case "map": {
         // map(cx,cy,sx,sy,cw,ch) over the imported __map__ array (128 wide).
         // PICO-8 defaults: cel 0,0 -> screen 0,0, 128x32 cells.
