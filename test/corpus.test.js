@@ -236,6 +236,27 @@ test("banked blob readers retain their XL bank and renamed far-call stubs", () =
   }
 });
 
+test("SDK emission hooks own API lowering and retain shared argument checks", () => {
+  let emitted = 0;
+  const paint = {
+    params: [["int", false], ["flip", true]], ret: "void",
+    emit(call, { argAt, cName }) {
+      emitted++;
+      return `${cName("lc_paint")}(${argAt(call, 0, "int", "0")}, ${argAt(call, 1, "flip", "1")})`;
+    },
+  };
+  const opts = { target: TARGETS.md, builtins: { paint }, callbacks: CALLBACKS };
+  const r = compile("function _draw() paint(3) paint(4,false) end", "hook.lua", opts);
+  assert.ok(r.ok, JSON.stringify(r.diagnostics));
+  assert.match(r.c, /md_paint\(3, 1\)/);
+  assert.match(r.c, /md_paint\(4, \(\(0\) \? 1 : 0\)\)/);
+  assert.equal(emitted, 2);
+  for (const args of ["", "1,true,3", "true"]) {
+    assert.ok(!compile(`function _draw() paint(${args}) end`, "hook.lua", opts).ok);
+  }
+  assert.equal(emitted, 2, "invalid calls must not reach the SDK emitter");
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",

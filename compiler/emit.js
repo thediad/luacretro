@@ -1104,6 +1104,12 @@ export function emit(chunk, symbols, file, opts = {}) {
     const name = callee.name;
     if (!b) return "0";
 
+    // SDK-owned ABI/policy lowering; standard type and arity checks already ran.
+    if (typeof b.emit === "function") return b.emit(e, { argAt, cName });
+
+    // SDK-owned ABI/policy lowering; standard type and arity checks already ran.
+    if (typeof b.emit === "function") return b.emit(e, { argAt, cName });
+
     if (b.special === "print") {
       // pf() = the print C-fn name, remapped lc_* -> gba_* on the GBA target.
       const pf = (suffix) => cName(`lc_print${suffix}`);

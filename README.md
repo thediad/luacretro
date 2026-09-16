@@ -47,8 +47,14 @@ and hardware restrictions.
 
 These calls use the SDK's normal prefix/finalRename rules. Bounds handling,
 map storage, flag storage, persistence, and palette restrictions remain in the
-SDK. `palt` is not migrated: the GameTank vendor currently embeds hardware
-policy that must be separated before adopting canonical luacretro there.
+SDK.
+
+For a target-specific ABI, a builtin may supply `emit(call, { argAt, cName })`.
+It runs after shared argument checks and returns a C expression. `argAt`
+uses the shared conversions; `cName` applies the target prefix. The callback
+may reject unsupported hardware operations by throwing an error. GameTank's
+`palt` descriptor uses this hook to own its color-zero-only policy; there is
+no GameTank palette restriction in the shared compiler.
 
 The emitter derives every per-platform behavior from a single capability table
 (`CAPS` in `compiler/emit.js`) keyed by `opts.target`:
