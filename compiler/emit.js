@@ -776,7 +776,7 @@ export function emit(chunk, symbols, file, opts = {}) {
                        : `(int)(${expr(e.left, "fixed")} >> ${16 + lg})`, "int", want);
         }
         // hardware divide (gba/md): native C. 6502 targets: runtime helper.
-        if (ok === "int") return cv(caps.nativeDiv
+        if (ok === "int") return cv(caps.nativeDiv && !caps.runtimeDivision
           ? `((${expr(e.left, "int")}) / (${expr(e.right, "int")}))`
           : `lc_ifdiv(${expr(e.left, "int")}, ${expr(e.right, "int")})`, "int", want);
         return cv(N8 ? `(${fixedCall("lc_fdiv", e.left, e.right)} >> 8)`
@@ -788,7 +788,7 @@ export function emit(chunk, symbols, file, opts = {}) {
           return cv(`(${expr(e.left, "fixed")} & ${(e.divConst * FONE) - 1}${FL})`, "fixed", want);
         }
         // hardware divide (gba/md): native modulo. 6502 targets: runtime helpers.
-        if (caps.nativeDiv) {
+        if (caps.nativeDiv && !caps.runtimeDivision) {
           if (k === "int") return cv(`((${expr(e.left, "int")}) % (${expr(e.right, "int")}))`, "int", want);
           // 16.16 fixed modulo == a % b on the raw fixed ints (fraction preserved).
           return cv(`((${expr(e.left, "fixed")}) % (${expr(e.right, "fixed")}))`, "fixed", want);
@@ -823,6 +823,9 @@ export function emit(chunk, symbols, file, opts = {}) {
   function fixedCall(fn, left, right) {
     const L = expr(left, "fixed");
     const R = expr(right, "fixed");
+    // SDKs can retain native multiplication while supplying floor/zero-safe
+    // division and modulo semantics in their runtime helpers.
+    if (caps.runtimeDivision && fn === "lc_fdiv") return `${fn}(${L}, ${R})`;
     // Hardware-divide targets (gba/md): 16.16 fixed mul/div are NATIVE C via a
     // 64-bit intermediate - a CPU with hardware multiply + divide needs neither
     // a runtime call nor zero-page staging (the whole lc_fmul/lc_fdiv/

@@ -278,6 +278,20 @@ test("SDK constant hooks fold only static numeric calls with valid arity", () =>
   assert.ok(!compile("local n=scale(3) function scale(x) return x end function _draw() end", "fold.lua", opts).ok);
 });
 
+test("runtimeDivision is opt-in and preserves native multiplication", () => {
+  const source = `local a=1.5 local b=2.5 local r=0.0
+    function _update() r=a/b r=a%b r=a*b end function _draw() end`;
+  for (const enabled of [false, true]) {
+    const target = { ...TARGETS.md, caps: { ...TARGETS.md.caps, runtimeDivision: enabled } };
+    const result = compile(source, "division.lua", { target, builtins: CORE, callbacks: CALLBACKS });
+    assert.ok(result.ok, JSON.stringify(result.diagnostics));
+    assert.equal(result.c.includes("md_fdiv("), enabled);
+    assert.equal(result.c.includes("md_ffmod("), enabled);
+    assert.match(result.c, /long long/);
+    assert.doesNotMatch(result.c, /md_fmul\(/);
+  }
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",
