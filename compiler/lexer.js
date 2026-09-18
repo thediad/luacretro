@@ -70,7 +70,7 @@ export function lex(src, file) {
     // Keep the one extra positive magnitude needed to spell the signed minimum
     // as `-32768`; the parser accepts it only when consumed by unary minus.
     const minMagnitude = isIntLiteral && value === 32768;
-    if ((value > 32767.9999847 && !minMagnitude) || value < -32768) {
+    if ((value > (32767 + 65535 / 65536) && !minMagnitude) || value < -32768) {
       err(`number ${value} is outside the 16.16 range (-32768 .. 32767.99998)`, l, c);
     }
     tokens.push({ type: "number", value, fixed: toFixed(value), isInt, minMagnitude, line: l, col: c });

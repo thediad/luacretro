@@ -293,6 +293,18 @@ test("runtimeDivision is opt-in and preserves native multiplication", () => {
   }
 });
 
+test("exact maximum 16.16 literals are accepted without widening the range", () => {
+  const opts = { target: TARGETS.md, builtins: CORE, callbacks: CALLBACKS };
+  for (const value of ["32767.99998474121", "0x7fff.ffff"]) {
+    const result = compile(`local x=${value} function _draw() end`, "max.lua", opts);
+    assert.ok(result.ok, JSON.stringify(result.diagnostics));
+    assert.match(result.c, /2147483647L/);
+  }
+  for (const value of ["32767.99999", "32768", "0x8000"]) {
+    assert.ok(!compile(`local x=${value} function _draw() end`, "max.lua", opts).ok);
+  }
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",
