@@ -779,6 +779,7 @@ export function emit(chunk, symbols, file, opts = {}) {
         if (ok === "int") return cv(caps.nativeDiv && !caps.runtimeDivision
           ? `((${expr(e.left, "int")}) / (${expr(e.right, "int")}))`
           : `lc_ifdiv(${expr(e.left, "int")}, ${expr(e.right, "int")})`, "int", want);
+        if (caps.runtimeDivision) return cv(`lc_ffdiv(${expr(e.left, "fixed")}, ${expr(e.right, "fixed")})`, "int", want);
         return cv(N8 ? `(${fixedCall("lc_fdiv", e.left, e.right)} >> 8)`
                      : `(int)(${fixedCall("lc_fdiv", e.left, e.right)} >> 16)`, "int", want);
       }

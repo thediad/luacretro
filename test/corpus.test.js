@@ -280,13 +280,14 @@ test("SDK constant hooks fold only static numeric calls with valid arity", () =>
 
 test("runtimeDivision is opt-in and preserves native multiplication", () => {
   const source = `local a=1.5 local b=2.5 local r=0.0
-    function _update() r=a/b r=a%b r=a*b end function _draw() end`;
+    function _update() r=a/b r=a%b r=a*b r=a\\b end function _draw() end`;
   for (const enabled of [false, true]) {
     const target = { ...TARGETS.md, caps: { ...TARGETS.md.caps, runtimeDivision: enabled } };
     const result = compile(source, "division.lua", { target, builtins: CORE, callbacks: CALLBACKS });
     assert.ok(result.ok, JSON.stringify(result.diagnostics));
     assert.equal(result.c.includes("md_fdiv("), enabled);
     assert.equal(result.c.includes("md_ffmod("), enabled);
+    assert.equal(result.c.includes("md_ffdiv("), enabled);
     assert.match(result.c, /long long/);
     assert.doesNotMatch(result.c, /md_fmul\(/);
   }
