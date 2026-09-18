@@ -300,9 +300,11 @@ test("exact maximum 16.16 literals are accepted without widening the range", () 
     assert.ok(result.ok, JSON.stringify(result.diagnostics));
     assert.match(result.c, /2147483647L/);
   }
-  for (const value of ["32767.99999", "32768", "0x8000"]) {
+  for (const value of ["32767.99999", "32768"]) {
     assert.ok(!compile(`local x=${value} function _draw() end`, "max.lua", opts).ok);
   }
+  // Hex is a signed bit pattern; 0x8000 intentionally denotes the minimum.
+  assert.ok(compile("local x=0x8000 function _draw() end", "min.lua", opts).ok);
 });
 
 test("sdkName threads into diagnostics", () => {
