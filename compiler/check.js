@@ -197,6 +197,14 @@ export function check(chunk, file, opts = {}) {
     }
   }
 
+  function checkInitializerRange(value, node) {
+    if (!opts.rejectInitializerOverflow || value === null) return;
+    const minimum = opts.num8 ? -128 : -32768;
+    const maximum = opts.num8 ? 127 + 255 / 256 : 32767 + 65535 / 65536;
+    if (!Number.isFinite(value) || value < minimum || value > maximum)
+      err(node, "constant initializer is outside the supported fixed-point range; clamp the value before storing it");
+  }
+
   // ---- pass 1: collect top-level declarations -------------------------------
   for (const s of chunk.stmts) {
     if (s.kind === "function") {
@@ -284,6 +292,7 @@ export function check(chunk, file, opts = {}) {
             err(s, `${init.callee.name}(n, v) initial value must be a constant`);
           }
           const ivv = iv ?? 0;
+          if (!bytes) checkInitializerRange(ivv, init);
           if (bytes && (!Number.isInteger(ivv) || ivv < 0 || ivv > 255)) {
             err(s, "array8(n, v) initial value must be an integer 0-255");
           }
@@ -311,6 +320,7 @@ export function check(chunk, file, opts = {}) {
           for (const el of init.elements) {
             const v = constEval(el);
             if (v === null) { bad = el; break; }
+            checkInitializerRange(v, el);
             if (!Number.isInteger(v)) anyFixed = true;
             vals.push(v);
           }
@@ -397,6 +407,7 @@ export function check(chunk, file, opts = {}) {
                  `(runtime init belongs in function _init())`);
         }
         const value = cv ?? 0;
+        checkInitializerRange(value, init ?? s);
         const isInt = Number.isInteger(value) && value >= -32768 && value <= 32767;
         globals.set(name, {
           kind: isInt ? "int" : "fixed",

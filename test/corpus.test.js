@@ -307,6 +307,17 @@ test("exact maximum 16.16 literals are accepted without widening the range", () 
   assert.ok(compile("local x=0x8000 function _draw() end", "min.lua", opts).ok);
 });
 
+test("initializer overflow rejection is opt-in", () => {
+  const opts = { target: TARGETS.md, builtins: CORE, callbacks: CALLBACKS };
+  for (const value of ["32767+1", "array(2,32767+1)", "{1,32767+1}"]) {
+    const source = `local x=${value} function _draw() end`;
+    assert.ok(compile(source, "overflow.lua", opts).ok);
+    const strict = compile(source, "overflow.lua", {...opts, rejectInitializerOverflow: true});
+    assert.ok(!strict.ok);
+    assert.match(strict.diagnostics.map(d=>d.message).join("\n"), /constant initializer is outside/);
+  }
+});
+
 test("sdkName threads into diagnostics", () => {
   // assigning an undeclared global inside a function -> the sdkName message
   const r = compile(`function _update() y = 5 end\nfunction _draw() end`, "t.lua",
