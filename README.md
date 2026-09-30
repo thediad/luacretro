@@ -1,6 +1,11 @@
 # luacretro
 
-[![npm version](https://img.shields.io/npm/v/luacretro.svg)](https://www.npmjs.com/package/luacretro)
+[![npm version](https://img.shields.io/npm/v/%40thediad%2Fluacretro.svg)](https://www.npmjs.com/package/@thediad/luacretro)
+
+This is the `@thediad/luacretro` distribution of Luis Montes's original
+`luacretro` compiler, maintained in the
+[`thediad/luacretro`](https://github.com/thediad/luacretro) fork for the
+corresponding console SDK forks.
 
 The shared Lua compiler front-end for the **gtlua** (GameTank / 6502),
 **gbalua** (Game Boy Advance / ARM), **mdlua** (Sega Genesis / 68000),
